@@ -1,0 +1,92 @@
+version: "3.5"
+
+# Secrets tanımları
+secrets:
+  db_password:
+    file: /home/alaslan/Masaüstü/Inception-main/secrets/db_password.txt
+  db_root_password:
+    file: /home/alaslan/Masaüstü/Inception-main/secrets/db_root_password.txt
+  credentials:
+    file: /home/alaslan/Masaüstü/Inception-main/secrets/credentials.txt
+
+
+# Volume tanımları
+volumes:
+  mariadb_volume:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${HOME}/data/mariadb
+
+  wordpress_volume:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${HOME}/data/wordpress
+
+# Network tanımı
+networks:
+  app-network:
+    name: app-network
+    driver: bridge
+
+# Services tanımları
+services:
+
+  # MariaDB servisi
+  mariadb:
+    container_name: mariadb
+    build: ./requirements/mariadb
+    env_file:
+      - .env
+    expose:
+      - 3306
+    networks:
+      - app-network
+    volumes:
+      - mariadb_volume:/var/lib/mysql
+    secrets:
+      - db_password
+      - db_root_password
+      - credentials
+    restart: always
+
+  # WordPress servisi
+  wordpress:
+    container_name: wordpress
+    build: ./requirements/wordpress
+    env_file:
+      - .env
+    expose:
+      - 9000
+    networks:
+      - app-network
+    volumes:
+      - wordpress_volume:/var/www/html
+    depends_on:
+      - mariadb
+    secrets:
+      - credentials
+      - db_password
+    restart: always
+
+  # NGINX servisi
+  nginx:
+    container_name: nginx
+    build: ./requirements/nginx
+    networks:
+      - app-network
+    ports:
+      - 443:443
+    volumes:
+      - wordpress_volume:/var/www/html
+    depends_on:
+      - mariadb
+      - wordpress
+    env_file:
+      - .env
+    secrets:
+      - credentials
+    restart: always
